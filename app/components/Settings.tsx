@@ -18,6 +18,7 @@ export default function Settings() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<ConfigStatus | null>(null);
   const [busy, setBusy] = useState<Resource | null>(null);
+  const [refreshed, setRefreshed] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +55,13 @@ export default function Settings() {
     }
   };
 
+  const refreshAll = () => {
+    window.dispatchEvent(new CustomEvent("ganymede:refresh"));
+    load();
+    setRefreshed(true);
+    window.setTimeout(() => setRefreshed(false), 1500);
+  };
+
   return (
     <>
       <button className="gear-btn" onClick={() => setOpen(true)} aria-label="Settings" title="Settings">
@@ -67,6 +75,14 @@ export default function Settings() {
               <button className="modal-close" onClick={() => setOpen(false)} aria-label="Close">
                 <Icon name="x" size={16} />
               </button>
+            </div>
+            <div className="settings-actions">
+              <button className="btn-secondary" onClick={refreshAll} disabled={refreshed}>
+                {refreshed ? "Refreshed" : "Refresh all"}
+              </button>
+              <span className="settings-actions-hint">
+                Re-fetches weather, calendar, and photos.
+              </span>
             </div>
             {status === null ? (
               <p className="settings-meta">Loading…</p>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Icon, { type IconName } from "./Icon";
 
 type Hour = { h: string; t: number; i: IconName };
@@ -23,23 +23,30 @@ export default function Weather({
   const [data, setData] = useState<WeatherData | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/weather");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body: WeatherData = await res.json();
+      setData(body);
+      setErr(null);
+      onData?.(body);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }, [onData]);
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/weather");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const body: WeatherData = await res.json();
-        setData(body);
-        setErr(null);
-        onData?.(body);
-      } catch (e) {
-        setErr((e as Error).message);
-      }
-    };
     load();
     const id = setInterval(load, 10 * 60 * 1000);
     return () => clearInterval(id);
-  }, [onData]);
+  }, [load]);
+
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener("ganymede:refresh", h);
+    return () => window.removeEventListener("ganymede:refresh", h);
+  }, [load]);
 
   return (
     <div className={`card weather ${className}`}>

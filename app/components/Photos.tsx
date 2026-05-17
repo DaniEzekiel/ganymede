@@ -53,7 +53,11 @@ export default function Photos({ className = "" }: { className?: string }) {
   useEffect(() => {
     const handler = () => load();
     window.addEventListener("ganymede:config-changed", handler);
-    return () => window.removeEventListener("ganymede:config-changed", handler);
+    window.addEventListener("ganymede:refresh", handler);
+    return () => {
+      window.removeEventListener("ganymede:config-changed", handler);
+      window.removeEventListener("ganymede:refresh", handler);
+    };
   }, [load]);
 
   const advance = useCallback(() => {

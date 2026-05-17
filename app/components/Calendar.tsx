@@ -99,7 +99,11 @@ export default function Calendar({ className = "" }: { className?: string }) {
   useEffect(() => {
     const handler = () => load();
     window.addEventListener("ganymede:config-changed", handler);
-    return () => window.removeEventListener("ganymede:config-changed", handler);
+    window.addEventListener("ganymede:refresh", handler);
+    return () => {
+      window.removeEventListener("ganymede:config-changed", handler);
+      window.removeEventListener("ganymede:refresh", handler);
+    };
   }, [load]);
 
   const connect = async (e: FormEvent) => {
