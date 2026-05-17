@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 
 type Event = { start: string; end: string; summary: string; location: string };
+type CalendarResponse =
+  | { configured: false }
+  | { configured: true; events: Event[] }
+  | { error: string };
 type AgendaDay = {
   date: number;
   dow: string;
@@ -54,20 +58,31 @@ function buildAgenda(events: Event[], ref: Date): AgendaDay[] {
 export default function Calendar({ className = "" }: { className?: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const now = useMemo(() => new Date(), []);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const now = new Date();
 
   useEffect(() => {
     const load = async () => {
       try {
         const res = await fetch("/api/calendar");
-        const body = await res.json();
+        const body: CalendarResponse = await res.json();
         if (!res.ok) {
           setEvents([]);
-          setErr(body.error ?? `HTTP ${res.status}`);
+          setConfigured(true);
+          setErr("error" in body ? body.error : `HTTP ${res.status}`);
           return;
         }
-        setEvents(body.events ?? []);
-        setErr(null);
+        if ("configured" in body && body.configured === false) {
+          setConfigured(false);
+          setEvents([]);
+          setErr(null);
+          return;
+        }
+        if ("configured" in body && body.configured === true) {
+          setConfigured(true);
+          setEvents(body.events ?? []);
+          setErr(null);
+        }
       } catch (e) {
         setErr((e as Error).message);
       }
@@ -85,6 +100,27 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const agenda = useMemo(() => buildAgenda(events, now), [events, now]);
   const monthLabel = now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const today = events.filter((e) => new Date(e.start).toDateString() === now.toDateString()).length;
+
+  if (configured === false) {
+    return (
+      <div className={`card cal ${className}`}>
+        <div className="card-head">
+          <div className="card-title">Calendar</div>
+          <div className="card-sub">Setup required</div>
+        </div>
+        <div className="cal-setup">
+          <h3>Connect Google Calendar</h3>
+          <ol>
+            <li>Open Google Calendar in a browser.</li>
+            <li>Hover your calendar in the left sidebar &rarr; <strong>⋮</strong> &rarr; <strong>Settings and sharing</strong>.</li>
+            <li>Scroll to <strong>Integrate calendar</strong> and copy the <strong>Secret address in iCal format</strong>.</li>
+            <li>Add <code>GOOGLE_CALENDAR_ICS_URL=&lt;url&gt;</code> to <code>.env.local</code> and restart.</li>
+          </ol>
+          <p className="cal-setup-note">Treat the URL like a password &mdash; anyone with it can read your calendar.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`card cal ${className}`}>

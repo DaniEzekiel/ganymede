@@ -6,7 +6,7 @@ export const revalidate = 300;
 export async function GET() {
   const icsUrl = process.env.GOOGLE_CALENDAR_ICS_URL;
   if (!icsUrl) {
-    return NextResponse.json({ error: "GOOGLE_CALENDAR_ICS_URL not set" }, { status: 500 });
+    return NextResponse.json({ configured: false });
   }
 
   try {
@@ -53,7 +53,7 @@ export async function GET() {
     }
 
     occurrences.sort((a, b) => a.start.getTime() - b.start.getTime());
-    return NextResponse.json({ events: occurrences.slice(0, 10) });
+    return NextResponse.json({ configured: true, events: occurrences.slice(0, 10) });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
