@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import ICAL from "ical.js";
+import { readConfig } from "../../lib/config";
 
 export const revalidate = 300;
 
 export async function GET() {
-  const icsUrl = process.env.GOOGLE_CALENDAR_ICS_URL;
+  const envUrl = process.env.GOOGLE_CALENDAR_ICS_URL;
+  const icsUrl = envUrl || (await readConfig()).calendarUrl;
   if (!icsUrl) {
     return NextResponse.json({ configured: false });
   }

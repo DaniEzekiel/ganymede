@@ -10,6 +10,7 @@ import Home from "./components/Home";
 import Commute from "./components/Commute";
 import Stocks from "./components/Stocks";
 import Quote from "./components/Quote";
+import Settings from "./components/Settings";
 
 const NAME = process.env.NEXT_PUBLIC_DASHBOARD_NAME ?? "GANYMEDE · HOME";
 const LOCATION = process.env.NEXT_PUBLIC_DASHBOARD_LOCATION ?? "Brookline, Mass.";
@@ -35,6 +36,7 @@ export default function Dashboard() {
         <div className="pill">
           <span className="live-dot" />Live · synced {syncedAt || "—"}
         </div>
+        <Settings />
       </div>
       <div className="grid">
         <Clock    className="w-clock"    sun={weather?.sun} />

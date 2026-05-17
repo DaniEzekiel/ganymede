@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 
 type Event = { start: string; end: string; summary: string; location: string };
@@ -59,38 +59,73 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [urlInput, setUrlInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const now = new Date();
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/calendar");
-        const body: CalendarResponse = await res.json();
-        if (!res.ok) {
-          setEvents([]);
-          setConfigured(true);
-          setErr("error" in body ? body.error : `HTTP ${res.status}`);
-          return;
-        }
-        if ("configured" in body && body.configured === false) {
-          setConfigured(false);
-          setEvents([]);
-          setErr(null);
-          return;
-        }
-        if ("configured" in body && body.configured === true) {
-          setConfigured(true);
-          setEvents(body.events ?? []);
-          setErr(null);
-        }
-      } catch (e) {
-        setErr((e as Error).message);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/calendar");
+      const body: CalendarResponse = await res.json();
+      if (!res.ok) {
+        setEvents([]);
+        setConfigured(true);
+        setErr("error" in body ? body.error : `HTTP ${res.status}`);
+        return;
       }
-    };
+      if ("configured" in body && body.configured === false) {
+        setConfigured(false);
+        setEvents([]);
+        setErr(null);
+        return;
+      }
+      if ("configured" in body && body.configured === true) {
+        setConfigured(true);
+        setEvents(body.events ?? []);
+        setErr(null);
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
     load();
     const id = setInterval(load, 5 * 60 * 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("ganymede:config-changed", handler);
+    return () => window.removeEventListener("ganymede:config-changed", handler);
+  }, [load]);
+
+  const connect = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const r = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlInput }),
+      });
+      const body = await r.json();
+      if (!r.ok) {
+        setSaveErr(body.error ?? `HTTP ${r.status}`);
+        return;
+      }
+      setUrlInput("");
+      await load();
+      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
+    } catch (e) {
+      setSaveErr((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const eventDates = useMemo(
     () => new Set(events.map((e) => new Date(e.start).toDateString())),
@@ -114,8 +149,22 @@ export default function Calendar({ className = "" }: { className?: string }) {
             <li>Open Google Calendar in a browser.</li>
             <li>Hover your calendar in the left sidebar &rarr; <strong>⋮</strong> &rarr; <strong>Settings and sharing</strong>.</li>
             <li>Scroll to <strong>Integrate calendar</strong> and copy the <strong>Secret address in iCal format</strong>.</li>
-            <li>Add <code>GOOGLE_CALENDAR_ICS_URL=&lt;url&gt;</code> to <code>.env.local</code> and restart.</li>
+            <li>Paste it below and click <strong>Connect</strong>.</li>
           </ol>
+          <form className="cal-connect-form" onSubmit={connect}>
+            <input
+              type="url"
+              placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              disabled={saving}
+              required
+            />
+            <button type="submit" className="btn-primary" disabled={saving || !urlInput.trim()}>
+              {saving ? "Connecting…" : "Connect"}
+            </button>
+          </form>
+          {saveErr && <div className="error">{saveErr}</div>}
           <p className="cal-setup-note">Treat the URL like a password &mdash; anyone with it can read your calendar.</p>
         </div>
       </div>
