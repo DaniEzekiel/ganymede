@@ -174,10 +174,10 @@ body {
 }
 .settings-note { font-size: 12px; color: var(--ink-3); margin: 0; }
 
-.cal-connect-form {
+.widget-connect-form {
   display: flex; flex-direction: column; gap: 8px;
 }
-.cal-connect-form input[type="url"] {
+.widget-connect-form input[type="url"] {
   width: 100%;
   font: 12px/1.3 var(--font-mono);
   padding: 8px 10px;
@@ -188,8 +188,8 @@ body {
   outline: none;
   transition: border-color 120ms ease;
 }
-.cal-connect-form input[type="url"]:focus { border-color: var(--accent); }
-.cal-connect-form input[type="url"]:disabled { opacity: 0.6; }
+.widget-connect-form input[type="url"]:focus { border-color: var(--accent); }
+.widget-connect-form input[type="url"]:disabled { opacity: 0.6; }
 
 .btn-primary, .btn-secondary {
   font: 500 13px/1 var(--font-sans);
@@ -409,22 +409,22 @@ body {
   background: var(--accent); position: absolute; bottom: 2px;
 }
 
-.cal-setup { display: flex; flex-direction: column; gap: 14px; flex: 1; justify-content: center; padding: 8px 4px; }
-.cal-setup h3 {
+.widget-setup { display: flex; flex-direction: column; gap: 14px; flex: 1; justify-content: center; padding: 8px 4px; }
+.widget-setup h3 {
   font-family: var(--font-display);
   font-variation-settings: 'opsz' 28, 'SOFT' 50;
   font-size: 22px; font-weight: 500; margin: 0; color: var(--ink);
 }
-.cal-setup ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
-.cal-setup li { font-size: 14px; line-height: 1.45; color: var(--ink-2); }
-.cal-setup li strong { color: var(--ink); font-weight: 600; }
-.cal-setup code {
+.widget-setup ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+.widget-setup li { font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.widget-setup li strong { color: var(--ink); font-weight: 600; }
+.widget-setup code {
   font: 12px/1 var(--font-mono);
   background: var(--bg-sunken);
   padding: 2px 6px; border-radius: 4px;
   color: var(--ink); white-space: nowrap;
 }
-.cal-setup-note {
+.widget-setup-note {
   font: 500 11px/1.4 var(--font-mono);
   letter-spacing: 0.04em; color: var(--ink-3);
   margin: 0; padding-top: 8px; border-top: 1px solid var(--rule-2);
@@ -472,9 +472,9 @@ body {
 
 /* ---------- Photos ---------- */
 .photos { padding: 0; overflow: hidden; position: relative; min-height: 220px; }
-.photo-frame { position: absolute; inset: 0; transition: opacity 0.8s ease; }
+.photo-frame { position: absolute; inset: 0; transition: opacity 0.8s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .photo-frame.out { opacity: 0; }
-.photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+.photo-frame img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .photo-caption {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 18px 20px;

@@ -2,14 +2,22 @@
 import { useCallback, useEffect, useState } from "react";
 import Icon from "./Icon";
 
-type Status =
+type ResourceStatus =
   | { configured: false; source: "none" }
-  | { configured: true; source: "env" | "file"; hint: string };
+  | { configured: true; source: "env" | "file" | "dir"; hint: string };
+
+type ConfigStatus = { calendar: ResourceStatus; photos: ResourceStatus };
+type Resource = "calendar" | "photos";
+
+const LABELS: Record<Resource, { title: string; envHint: string }> = {
+  calendar: { title: "Google Calendar", envHint: ".env.local" },
+  photos: { title: "Apple Photos", envHint: ".env.local (PHOTOS_DIR)" },
+};
 
 export default function Settings() {
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState<Status | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<ConfigStatus | null>(null);
+  const [busy, setBusy] = useState<Resource | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -35,14 +43,14 @@ export default function Settings() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const disconnect = async () => {
-    setBusy(true);
+  const disconnect = async (resource: Resource) => {
+    setBusy(resource);
     try {
-      await fetch("/api/config", { method: "DELETE" });
+      await fetch(`/api/config/${resource}`, { method: "DELETE" });
       await load();
       window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -60,25 +68,37 @@ export default function Settings() {
                 <Icon name="x" size={16} />
               </button>
             </div>
-            <section className="settings-section">
-              <h3>Google Calendar</h3>
-              {status === null ? (
-                <p className="settings-meta">Loading…</p>
-              ) : status.configured ? (
-                <>
-                  <p className="settings-meta">Connected · <code>{status.hint}</code></p>
-                  {status.source === "env" ? (
-                    <p className="settings-note">Set via <code>.env.local</code> &mdash; edit the file to change.</p>
+            {status === null ? (
+              <p className="settings-meta">Loading…</p>
+            ) : (
+              (["calendar", "photos"] as const).map((r) => (
+                <section className="settings-section" key={r}>
+                  <h3>{LABELS[r].title}</h3>
+                  {status[r].configured ? (
+                    <>
+                      <p className="settings-meta">Connected · <code>{status[r].hint}</code></p>
+                      {status[r].source === "file" ? (
+                        <button
+                          className="btn-secondary"
+                          onClick={() => disconnect(r)}
+                          disabled={busy === r}
+                        >
+                          {busy === r ? "Disconnecting…" : "Disconnect"}
+                        </button>
+                      ) : (
+                        <p className="settings-note">
+                          Set via <code>{LABELS[r].envHint}</code> &mdash; edit the file to change.
+                        </p>
+                      )}
+                    </>
                   ) : (
-                    <button className="btn-secondary" onClick={disconnect} disabled={busy}>
-                      {busy ? "Disconnecting…" : "Disconnect"}
-                    </button>
+                    <p className="settings-meta">
+                      Not connected. Use the {r} widget to add a URL.
+                    </p>
                   )}
-                </>
-              ) : (
-                <p className="settings-meta">Not connected. Use the calendar widget to add a URL.</p>
-              )}
-            </section>
+                </section>
+              ))
+            )}
           </div>
         </div>
       )}

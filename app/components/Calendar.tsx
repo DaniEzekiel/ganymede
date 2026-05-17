@@ -107,7 +107,7 @@ export default function Calendar({ className = "" }: { className?: string }) {
     setSaving(true);
     setSaveErr(null);
     try {
-      const r = await fetch("/api/config", {
+      const r = await fetch("/api/config/calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: urlInput }),
@@ -143,7 +143,7 @@ export default function Calendar({ className = "" }: { className?: string }) {
           <div className="card-title">Calendar</div>
           <div className="card-sub">Setup required</div>
         </div>
-        <div className="cal-setup">
+        <div className="widget-setup">
           <h3>Connect Google Calendar</h3>
           <ol>
             <li>Open Google Calendar in a browser.</li>
@@ -151,7 +151,7 @@ export default function Calendar({ className = "" }: { className?: string }) {
             <li>Scroll to <strong>Integrate calendar</strong> and copy the <strong>Secret address in iCal format</strong>.</li>
             <li>Paste it below and click <strong>Connect</strong>.</li>
           </ol>
-          <form className="cal-connect-form" onSubmit={connect}>
+          <form className="widget-connect-form" onSubmit={connect}>
             <input
               type="url"
               placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
@@ -165,7 +165,7 @@ export default function Calendar({ className = "" }: { className?: string }) {
             </button>
           </form>
           {saveErr && <div className="error">{saveErr}</div>}
-          <p className="cal-setup-note">Treat the URL like a password &mdash; anyone with it can read your calendar.</p>
+          <p className="widget-setup-note">Treat the URL like a password &mdash; anyone with it can read your calendar.</p>
         </div>
       </div>
     );
