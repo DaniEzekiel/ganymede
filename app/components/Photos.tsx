@@ -65,11 +65,12 @@ export default function Photos({ className = "" }: { className?: string }) {
 
   if (slides.length === 0) return <div className={`card photos ${className}`} />;
 
-  const slide = slides[idx];
+  const safeIdx = idx % slides.length;
+  const slide = slides[safeIdx];
 
   return (
     <div className={`card flush photos ${className}`}>
-      <div className={"photo-frame" + (fading ? " out" : "")} key={idx}>
+      <div className={"photo-frame" + (fading ? " out" : "")} key={safeIdx}>
         {slide.url ? (
           <img src={slide.url} alt={slide.title} />
         ) : (
@@ -79,7 +80,7 @@ export default function Photos({ className = "" }: { className?: string }) {
       </div>
       <div className="photo-dots">
         {slides.map((_, i) => (
-          <i key={i} className={i === idx ? "on" : ""} />
+          <i key={i} className={i === safeIdx ? "on" : ""} />
         ))}
       </div>
       <div className="photo-caption">
@@ -87,7 +88,7 @@ export default function Photos({ className = "" }: { className?: string }) {
           <div className="title">{slide.title}</div>
           <div className="meta">{slide.meta}</div>
         </div>
-        <div className="meta">{idx + 1} / {slides.length}</div>
+        <div className="meta">{safeIdx + 1} / {slides.length}</div>
       </div>
     </div>
   );
