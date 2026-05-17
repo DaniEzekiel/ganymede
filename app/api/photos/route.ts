@@ -3,7 +3,7 @@ import { readdir } from "node:fs/promises";
 import { readConfig, dirExists } from "../../lib/config";
 import { extractToken, fetchSharedAlbum } from "../../lib/icloudShared";
 
-export const revalidate = 600;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const dir = process.env.PHOTOS_DIR;
