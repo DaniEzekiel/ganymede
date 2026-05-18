@@ -9,10 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "google-auth-library": "^10.6.2",
     "next": "^15.5.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "ical.js": "2.1.0"
+    "react-dom": "19.0.0"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
-import { readConfig, maskUrl, maskICloudUrl, dirExists } from "../../lib/config";
+import { readConfig, maskICloudUrl, dirExists } from "../../lib/config";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const cfg = await readConfig();
-  const envCalendar = process.env.GOOGLE_CALENDAR_ICS_URL;
   const envPhotosDir = process.env.PHOTOS_DIR;
   const envPhotosUsable = envPhotosDir ? await dirExists(envPhotosDir) : false;
 
-  const calendar = envCalendar
-    ? { configured: true, source: "env" as const, hint: maskUrl(envCalendar) }
-    : cfg.calendarUrl
-    ? { configured: true, source: "file" as const, hint: maskUrl(cfg.calendarUrl) }
-    : { configured: false, source: "none" as const };
+  const google = cfg.google?.tokens?.refresh_token
+    ? { connected: true as const, email: cfg.google.email ?? null }
+    : { connected: false as const };
 
   const photos = envPhotosUsable
     ? { configured: true, source: "env" as const, hint: envPhotosDir! }
@@ -21,5 +18,5 @@ export async function GET() {
     ? { configured: true, source: "file" as const, hint: maskICloudUrl(cfg.photosUrl) }
     : { configured: false, source: "none" as const };
 
-  return NextResponse.json({ calendar, photos });
+  return NextResponse.json({ google, photos });
 }

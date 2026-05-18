@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 
 type Event = { start: string; end: string; summary: string; location: string };
@@ -59,9 +59,6 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [urlInput, setUrlInput] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
 
   useEffect(() => {
@@ -116,31 +113,6 @@ export default function Calendar({ className = "" }: { className?: string }) {
     };
   }, [load]);
 
-  const connect = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setSaveErr(null);
-    try {
-      const r = await fetch("/api/config/calendar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: urlInput }),
-      });
-      const body = await r.json();
-      if (!r.ok) {
-        setSaveErr(body.error ?? `HTTP ${r.status}`);
-        return;
-      }
-      setUrlInput("");
-      await load();
-      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
-    } catch (e) {
-      setSaveErr((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const eventDates = useMemo(
     () => new Set(events.map((e) => new Date(e.start).toDateString())),
     [events],
@@ -158,28 +130,13 @@ export default function Calendar({ className = "" }: { className?: string }) {
           <div className="card-sub">Setup required</div>
         </div>
         <div className="widget-setup">
-          <h3>Connect Google Calendar</h3>
-          <ol>
-            <li>Open Google Calendar in a browser.</li>
-            <li>Hover your calendar in the left sidebar &rarr; <strong>⋮</strong> &rarr; <strong>Settings and sharing</strong>.</li>
-            <li>Scroll to <strong>Integrate calendar</strong> and copy the <strong>Secret address in iCal format</strong>.</li>
-            <li>Paste it below and click <strong>Connect</strong>.</li>
-          </ol>
-          <form className="widget-connect-form" onSubmit={connect}>
-            <input
-              type="url"
-              placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              disabled={saving}
-              required
-            />
-            <button type="submit" className="btn-primary" disabled={saving || !urlInput.trim()}>
-              {saving ? "Connecting…" : "Connect"}
-            </button>
-          </form>
-          {saveErr && <div className="error">{saveErr}</div>}
-          <p className="widget-setup-note">Treat the URL like a password &mdash; anyone with it can read your calendar.</p>
+          <h3>Sign in with Google</h3>
+          <p className="widget-setup-note">
+            Grants read access to your primary calendar and read/write access to Google Tasks.
+          </p>
+          <a className="btn-primary" href="/api/auth/google/start" style={{ display: "inline-block", textAlign: "center" }}>
+            Sign in with Google
+          </a>
         </div>
       </div>
     );

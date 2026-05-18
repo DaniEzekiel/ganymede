@@ -1,62 +1,50 @@
 import { NextResponse } from "next/server";
-import ICAL from "ical.js";
-import { readConfig } from "../../lib/config";
+import { googleFetch } from "../../lib/google";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
+
+type GEvent = {
+  summary?: string;
+  location?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+};
+type GEventsList = { items?: GEvent[] };
 
 export async function GET() {
-  const envUrl = process.env.GOOGLE_CALENDAR_ICS_URL;
-  const icsUrl = envUrl || (await readConfig()).calendarUrl;
-  if (!icsUrl) {
-    return NextResponse.json({ configured: false });
-  }
-
   try {
-    const res = await fetch(icsUrl, { next: { revalidate: 300 } });
-    if (!res.ok) throw new Error(`upstream ${res.status}`);
-    const text = await res.text();
-
-    const jcal = ICAL.parse(text);
-    const comp = new ICAL.Component(jcal);
-    const vevents = comp.getAllSubcomponents("vevent");
-
-    const now = ICAL.Time.now();
-    const horizon = now.clone();
-    horizon.addDuration(ICAL.Duration.fromSeconds(14 * 24 * 3600));
-
-    const occurrences: { start: Date; end: Date; summary: string; location: string }[] = [];
-
-    for (const v of vevents) {
-      const event = new ICAL.Event(v);
-      if (event.isRecurring()) {
-        const iter = event.iterator();
-        let next;
-        while ((next = iter.next())) {
-          if (next.compare(horizon) > 0) break;
-          if (next.compare(now) < 0) continue;
-          const detail = event.getOccurrenceDetails(next);
-          occurrences.push({
-            start: detail.startDate.toJSDate(),
-            end: detail.endDate.toJSDate(),
-            summary: event.summary || "(no title)",
-            location: event.location || "",
-          });
-        }
-      } else {
-        const start = event.startDate.toJSDate();
-        if (start < now.toJSDate() || start > horizon.toJSDate()) continue;
-        occurrences.push({
-          start,
-          end: event.endDate.toJSDate(),
-          summary: event.summary || "(no title)",
-          location: event.location || "",
-        });
-      }
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const params = new URLSearchParams({
+      timeMin: now.toISOString(),
+      timeMax: horizon.toISOString(),
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: "10",
+    });
+    const res = await googleFetch(`/calendar/v3/calendars/primary/events?${params}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`upstream ${res.status}: ${text.slice(0, 120)}`);
     }
-
-    occurrences.sort((a, b) => a.start.getTime() - b.start.getTime());
-    return NextResponse.json({ configured: true, events: occurrences.slice(0, 10) });
+    const data = (await res.json()) as GEventsList;
+    const events = (data.items ?? [])
+      .map((e) => {
+        const startIso = e.start?.dateTime ?? e.start?.date;
+        const endIso = e.end?.dateTime ?? e.end?.date;
+        if (!startIso || !endIso) return null;
+        return {
+          start: new Date(startIso).toISOString(),
+          end: new Date(endIso).toISOString(),
+          summary: e.summary || "(no title)",
+          location: e.location || "",
+        };
+      })
+      .filter((e): e is NonNullable<typeof e> => e !== null);
+    return NextResponse.json({ configured: true, events });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 502 });
+    const msg = (err as Error).message;
+    if (msg === "not_connected") return NextResponse.json({ configured: false });
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
