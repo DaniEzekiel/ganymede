@@ -555,6 +555,34 @@ body {
 .news li .h { font-size: 13px; color: var(--ink); line-height: 1.35; text-wrap: pretty; }
 
 /* ---------- Tasks ---------- */
+.tasks .task-add {
+  display: flex; gap: 6px; align-items: center;
+  margin-bottom: 8px;
+}
+.tasks .task-add input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font: 400 13px/1.2 var(--font-sans);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.tasks .task-add input:focus { border-color: var(--ink-3); }
+.tasks .task-add input::placeholder { color: var(--ink-3); }
+.tasks .task-add button {
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-size: 16px; line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.tasks .task-add button:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
+.tasks .task-add button:disabled { opacity: 0.4; cursor: not-allowed; }
 .tasks ul { list-style: none; padding: 0; margin: 0; }
 .tasks li {
   display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: center;
