@@ -136,7 +136,7 @@ export default function Tasks({ className = "" }: { className?: string }) {
       </form>
       {err && <div className="error" style={{ marginTop: 4 }}>{err}</div>}
       <ul>
-        {tasks.map((t) => (
+        {[...tasks].sort((a, b) => Number(a.done) - Number(b.done)).map((t) => (
           <li key={t.id} className={t.done ? "done" : ""} onClick={() => toggle(t.id)}>
             <div className="box"><Icon name="check" size={12} /></div>
             <div className="label">{t.label}</div>

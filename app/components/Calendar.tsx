@@ -14,14 +14,16 @@ type AgendaDay = {
   events: { time: string; c: number; title: string }[];
 };
 
-function buildMiniMonth(ref: Date, eventDates: Set<string>) {
+type MiniCell = { n: number; off?: boolean; today?: boolean; has?: boolean; iso?: string };
+
+function buildMiniMonth(ref: Date, eventDates: Set<string>): MiniCell[] {
   const year = ref.getFullYear();
   const month = ref.getMonth();
   const first = new Date(year, month, 1);
   const startOffset = first.getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
-  const cells: { n: number; off?: boolean; today?: boolean; has?: boolean }[] = [];
+  const cells: MiniCell[] = [];
   for (let i = startOffset - 1; i >= 0; i--) cells.push({ n: prevMonthDays - i, off: true });
   for (let i = 1; i <= daysInMonth; i++) {
     const iso = new Date(year, month, i).toDateString();
@@ -29,6 +31,7 @@ function buildMiniMonth(ref: Date, eventDates: Set<string>) {
       n: i,
       today: i === ref.getDate(),
       has: eventDates.has(iso),
+      iso,
     });
   }
   while (cells.length % 7) cells.push({ n: cells.length - startOffset - daysInMonth + 1, off: true });
@@ -60,6 +63,7 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
+  const [selectedIso, setSelectedIso] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -119,6 +123,11 @@ export default function Calendar({ className = "" }: { className?: string }) {
   );
   const mini = useMemo(() => buildMiniMonth(now, eventDates), [now, eventDates]);
   const agenda = useMemo(() => buildAgenda(events, now), [events, now]);
+  const selectedAgenda = useMemo(
+    () => (selectedIso ? buildAgenda(events.filter((e) => new Date(e.start).toDateString() === selectedIso), now) : null),
+    [selectedIso, events, now],
+  );
+  const selectedDate = selectedIso ? new Date(selectedIso) : null;
   const monthLabel = now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const today = events.filter((e) => new Date(e.start).toDateString() === now.toDateString()).length;
 
@@ -159,18 +168,34 @@ export default function Calendar({ className = "" }: { className?: string }) {
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <div className="dow" key={"dow" + i}>{d}</div>
         ))}
-        {mini.map((d, i) => (
-          <div
-            key={i}
-            className={"d" + (d.off ? " off" : "") + (d.today ? " today" : "") + (d.has ? " has" : "")}
-          >
-            {d.n}
-          </div>
-        ))}
+        {mini.map((d, i) => {
+          const sel = d.iso && d.iso === selectedIso;
+          const clickable = Boolean(d.iso);
+          return (
+            <div
+              key={i}
+              className={"d" + (d.off ? " off" : "") + (d.today ? " today" : "") + (d.has ? " has" : "") + (sel ? " sel" : "")}
+              onClick={clickable ? () => setSelectedIso((cur) => (cur === d.iso ? null : d.iso!)) : undefined}
+              role={clickable ? "button" : undefined}
+              style={clickable ? { cursor: "pointer" } : undefined}
+            >
+              {d.n}
+            </div>
+          );
+        })}
       </div>
       {err && <div className="error" style={{ marginTop: 10 }}>calendar: {err}</div>}
+      {selectedIso && selectedDate && (
+        <div className="agenda-filter">
+          <span>{selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</span>
+          <button type="button" onClick={() => setSelectedIso(null)} aria-label="Clear day filter">Clear</button>
+        </div>
+      )}
       <div className="agenda">
-        {agenda.map((day, i) => (
+        {(selectedAgenda ?? agenda).length === 0 && selectedIso && (
+          <div className="agenda-empty">No events on this day.</div>
+        )}
+        {(selectedAgenda ?? agenda).map((day, i) => (
           <div className={"agenda-day" + (day.today ? " today" : "")} key={i}>
             <div className="dcell">
               <div className="num">{day.date}</div>
