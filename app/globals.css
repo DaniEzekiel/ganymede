@@ -421,22 +421,59 @@ body {
   background: var(--accent); position: absolute; bottom: 2px;
 }
 .cal .mini .d.today.has::after { background: var(--accent-ink); }
-.agenda-filter {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-top: 10px; padding: 6px 0 4px;
-  border-bottom: 1px dashed var(--rule);
-  font: 500 11px/1 var(--font-mono);
-  letter-spacing: 0.04em;
-  color: var(--ink-2);
-  text-transform: uppercase;
+.day-overlay {
+  position: absolute; inset: 0;
+  background: oklch(from var(--bg) l c h / 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex; align-items: stretch; justify-content: stretch;
+  padding: calc(16px * var(--density));
+  z-index: 5;
+  animation: day-overlay-fade 140ms ease;
 }
-.agenda-filter button {
-  background: transparent; border: 1px solid var(--rule); border-radius: var(--r-sm);
-  color: var(--ink-3); font: 500 10px/1 var(--font-mono); letter-spacing: 0.06em;
-  padding: 4px 8px; cursor: pointer; text-transform: uppercase;
+@keyframes day-overlay-fade { from { opacity: 0; } to { opacity: 1; } }
+.day-overlay-panel {
+  flex: 1;
+  background: oklch(from var(--bg-raised) l c h / 0.92);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.day-overlay-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: calc(14px * var(--density)) calc(16px * var(--density));
+  border-bottom: 1px solid var(--rule-2);
+}
+.day-overlay-dow {
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 4px;
+}
+.day-overlay-date {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 36, 'SOFT' 50;
+  font-size: 22px; line-height: 1; color: var(--ink);
+}
+.day-overlay-close {
+  width: 26px; height: 26px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--rule);
+  color: var(--ink-2); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
   transition: color 120ms ease, border-color 120ms ease;
 }
-.agenda-filter button:hover { color: var(--ink); border-color: var(--ink-3); }
+.day-overlay-close:hover { color: var(--ink); border-color: var(--ink-3); }
+.day-overlay-body {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(10px * var(--density)) calc(16px * var(--density));
+}
+.day-overlay-body .evts { display: flex; flex-direction: column; gap: 6px; }
 .agenda-empty {
   padding: 14px 0;
   font: 500 11px/1 var(--font-mono);

@@ -185,17 +185,8 @@ export default function Calendar({ className = "" }: { className?: string }) {
         })}
       </div>
       {err && <div className="error" style={{ marginTop: 10 }}>calendar: {err}</div>}
-      {selectedIso && selectedDate && (
-        <div className="agenda-filter">
-          <span>{selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</span>
-          <button type="button" onClick={() => setSelectedIso(null)} aria-label="Clear day filter">Clear</button>
-        </div>
-      )}
       <div className="agenda">
-        {(selectedAgenda ?? agenda).length === 0 && selectedIso && (
-          <div className="agenda-empty">No events on this day.</div>
-        )}
-        {(selectedAgenda ?? agenda).map((day, i) => (
+        {agenda.map((day, i) => (
           <div className={"agenda-day" + (day.today ? " today" : "")} key={i}>
             <div className="dcell">
               <div className="num">{day.date}</div>
@@ -213,6 +204,36 @@ export default function Calendar({ className = "" }: { className?: string }) {
           </div>
         ))}
       </div>
+      {selectedIso && selectedDate && (
+        <div className="day-overlay" onClick={() => setSelectedIso(null)} role="dialog" aria-label={`Events on ${selectedDate.toDateString()}`}>
+          <div className="day-overlay-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="day-overlay-head">
+              <div>
+                <div className="day-overlay-dow">{selectedDate.toLocaleDateString(undefined, { weekday: "long" })}</div>
+                <div className="day-overlay-date">{selectedDate.toLocaleDateString(undefined, { month: "long", day: "numeric" })}</div>
+              </div>
+              <button type="button" className="day-overlay-close" onClick={() => setSelectedIso(null)} aria-label="Close">
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+            <div className="day-overlay-body">
+              {selectedAgenda && selectedAgenda.length > 0 ? (
+                <div className="evts">
+                  {selectedAgenda[0].events.map((e, j) => (
+                    <div className="evt" key={j}>
+                      <div className={"bar c" + e.c} />
+                      <div className="time">{e.time}</div>
+                      <div className="title">{e.title}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="agenda-empty">No events on this day.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
