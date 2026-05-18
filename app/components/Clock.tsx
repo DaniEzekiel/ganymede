@@ -8,8 +8,16 @@ export default function Clock({ sun, className = "" }: { sun?: Sun; className?: 
 
   useEffect(() => {
     setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 15_000);
-    return () => clearInterval(id);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const msToNextMinute = 60_000 - (Date.now() % 60_000);
+    const align = setTimeout(() => {
+      setNow(new Date());
+      interval = setInterval(() => setNow(new Date()), 60_000);
+    }, msToNextMinute);
+    return () => {
+      clearTimeout(align);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   const h = now ? now.getHours() : 0;

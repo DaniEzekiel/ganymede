@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type Photo = { url: string; title: string; meta: string };
 type PhotosResponse =
@@ -60,12 +60,16 @@ export default function Photos({ className = "" }: { className?: string }) {
     };
   }, [load]);
 
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const advance = useCallback(() => {
     if (photos.length < 2) return;
     setFading(true);
-    setTimeout(() => {
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    fadeTimer.current = setTimeout(() => {
       setIdx((i) => (i + 1) % photos.length);
       setFading(false);
+      fadeTimer.current = null;
     }, FADE_MS);
   }, [photos.length]);
 
@@ -74,6 +78,12 @@ export default function Photos({ className = "" }: { className?: string }) {
     const t = setInterval(advance, ROTATE_MS);
     return () => clearInterval(t);
   }, [advance, resetTick]);
+
+  useEffect(() => {
+    return () => {
+      if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    };
+  }, []);
 
   const handleTap = () => {
     if (fading || photos.length < 2) return;

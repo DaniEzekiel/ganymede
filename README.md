@@ -1,6 +1,6 @@
 # Ganymede — Raspberry Pi Dashboard
 
-A Dakboard-style home dashboard built with Next.js 15 (App Router) and React 19. Designed to run fullscreen on a Raspberry Pi wired to a TV or monitor.
+A home dashboard built with Next.js 15 (App Router) and React 19. Designed to run fullscreen on a Raspberry Pi wired to a TV or monitor.
 
 **10 widgets** on a 24-column grid: clock with sunrise/sunset, weather (current + 6-hour + 5-day), calendar (mini month + agenda), photo slideshow, news briefing, tasks, smart home tiles, commute times, markets, and a daily quote. Warm paper aesthetic built on oklch color space with Fraunces + Inter Tight + JetBrains Mono.
 

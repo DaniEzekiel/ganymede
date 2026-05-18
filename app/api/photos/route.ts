@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { readdir } from "node:fs/promises";
 import { readConfig, dirExists } from "../../lib/config";
 import { extractToken, fetchSharedAlbum } from "../../lib/icloudShared";
 
 export const dynamic = "force-dynamic";
+
+const ICLOUD_ALBUM_TAG = "icloud-album";
+const getCachedAlbum = unstable_cache(
+  async (token: string) => fetchSharedAlbum(token),
+  ["icloud-album"],
+  { revalidate: 600, tags: [ICLOUD_ALBUM_TAG] },
+);
 
 export async function GET() {
   const dir = process.env.PHOTOS_DIR;
@@ -36,7 +44,7 @@ export async function GET() {
       );
     }
     try {
-      const photos = await fetchSharedAlbum(token);
+      const photos = await getCachedAlbum(token);
       return NextResponse.json({ configured: true, source: "icloud", photos });
     } catch (err) {
       return NextResponse.json(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import {
   writePhotosUrl,
   clearPhotosUrl,
@@ -25,12 +25,14 @@ export async function POST(req: Request) {
     );
   }
   await writePhotosUrl(url);
+  revalidateTag("icloud-album");
   revalidatePath("/api/photos");
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE() {
   await clearPhotosUrl();
+  revalidateTag("icloud-album");
   revalidatePath("/api/photos");
   return NextResponse.json({ ok: true });
 }

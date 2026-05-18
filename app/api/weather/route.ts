@@ -57,9 +57,11 @@ export async function GET() {
     const hourlyTemps: number[] = data.hourly.temperature_2m;
     const hourlyCodes: number[] = data.hourly.weather_code;
 
-    const startIdx = hourlyTimes.findIndex((t) => t >= nowIso);
+    const rawStart = hourlyTimes.findIndex((t) => t >= nowIso);
+    const maxStart = Math.max(0, hourlyTimes.length - 6);
+    const startIdx = Math.min(Math.max(0, rawStart), maxStart);
     const hours = Array.from({ length: 6 }, (_, i) => {
-      const idx = Math.max(0, startIdx) + i;
+      const idx = startIdx + i;
       return {
         h: formatHour(hourlyTimes[idx]),
         t: Math.round(hourlyTemps[idx]),

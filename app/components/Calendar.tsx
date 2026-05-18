@@ -62,7 +62,17 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
-  const now = new Date();
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setNow((prev) => {
+        const next = new Date();
+        return prev.toDateString() === next.toDateString() ? prev : next;
+      });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const load = useCallback(async () => {
     try {
