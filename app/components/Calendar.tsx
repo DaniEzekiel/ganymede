@@ -1,11 +1,11 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 
 type Event = { start: string; end: string; summary: string; location: string };
 type CalendarResponse =
   | { configured: false }
-  | { configured: true; events: Event[] }
+  | { configured: true; events: Event[]; warning?: string }
   | { error: string };
 type AgendaDay = {
   date: number;
@@ -16,20 +16,21 @@ type AgendaDay = {
 
 type MiniCell = { n: number; off?: boolean; today?: boolean; has?: boolean; iso?: string };
 
-function buildMiniMonth(ref: Date, eventDates: Set<string>): MiniCell[] {
-  const year = ref.getFullYear();
-  const month = ref.getMonth();
+function buildMiniMonth(view: Date, today: Date, eventDates: Set<string>): MiniCell[] {
+  const year = view.getFullYear();
+  const month = view.getMonth();
   const first = new Date(year, month, 1);
   const startOffset = first.getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
+  const todayIso = today.toDateString();
   const cells: MiniCell[] = [];
   for (let i = startOffset - 1; i >= 0; i--) cells.push({ n: prevMonthDays - i, off: true });
   for (let i = 1; i <= daysInMonth; i++) {
     const iso = new Date(year, month, i).toDateString();
     cells.push({
       n: i,
-      today: i === ref.getDate(),
+      today: iso === todayIso,
       has: eventDates.has(iso),
       iso,
     });
@@ -63,7 +64,11 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
+  const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [selectedIso, setSelectedIso] = useState<string | null>(null);
+  const [appleUrlInput, setAppleUrlInput] = useState("");
+  const [appleSaving, setAppleSaving] = useState(false);
+  const [appleSaveErr, setAppleSaveErr] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -121,15 +126,46 @@ export default function Calendar({ className = "" }: { className?: string }) {
     () => new Set(events.map((e) => new Date(e.start).toDateString())),
     [events],
   );
-  const mini = useMemo(() => buildMiniMonth(now, eventDates), [now, eventDates]);
+  const mini = useMemo(() => buildMiniMonth(viewDate, now, eventDates), [viewDate, now, eventDates]);
   const agenda = useMemo(() => buildAgenda(events, now), [events, now]);
   const selectedAgenda = useMemo(
     () => (selectedIso ? buildAgenda(events.filter((e) => new Date(e.start).toDateString() === selectedIso), now) : null),
     [selectedIso, events, now],
   );
   const selectedDate = selectedIso ? new Date(selectedIso) : null;
-  const monthLabel = now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = viewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const today = events.filter((e) => new Date(e.start).toDateString() === now.toDateString()).length;
+  const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+  const viewingToday = sameMonth(viewDate, now);
+  const stepMonth = (delta: number) => {
+    setSelectedIso(null);
+    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
+  };
+
+  const connectApple = async (e: FormEvent) => {
+    e.preventDefault();
+    setAppleSaving(true);
+    setAppleSaveErr(null);
+    try {
+      const r = await fetch("/api/config/apple-calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: appleUrlInput }),
+      });
+      const body = await r.json();
+      if (!r.ok) {
+        setAppleSaveErr(body.error ?? `HTTP ${r.status}`);
+        return;
+      }
+      setAppleUrlInput("");
+      await load();
+      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
+    } catch (e) {
+      setAppleSaveErr((e as Error).message);
+    } finally {
+      setAppleSaving(false);
+    }
+  };
 
   if (configured === false) {
     return (
@@ -139,13 +175,28 @@ export default function Calendar({ className = "" }: { className?: string }) {
           <div className="card-sub">Setup required</div>
         </div>
         <div className="widget-setup">
-          <h3>Sign in with Google</h3>
-          <p className="widget-setup-note">
-            Grants read access to your primary calendar and read/write access to Google Tasks.
-          </p>
+          <h3>Connect a calendar</h3>
           <a className="btn-primary" href="/api/auth/google/start" style={{ display: "inline-block", textAlign: "center" }}>
             Sign in with Google
           </a>
+          <div className="widget-setup-divider"><span>or paste an Apple Calendar link</span></div>
+          <form className="widget-connect-form" onSubmit={connectApple}>
+            <input
+              type="text"
+              placeholder="webcal://p…-caldav.icloud.com/published/…"
+              value={appleUrlInput}
+              onChange={(e) => setAppleUrlInput(e.target.value)}
+              disabled={appleSaving}
+              required
+            />
+            <button type="submit" className="btn-secondary" disabled={appleSaving || !appleUrlInput.trim()}>
+              {appleSaving ? "Connecting…" : "Connect"}
+            </button>
+          </form>
+          {appleSaveErr && <div className="error">{appleSaveErr}</div>}
+          <p className="widget-setup-note">
+            In macOS Calendar, right-click a calendar &rarr; Share &rarr; Public Calendar &rarr; copy the link.
+          </p>
         </div>
       </div>
     );
@@ -158,10 +209,32 @@ export default function Calendar({ className = "" }: { className?: string }) {
         <div className="card-sub">{today} event{today === 1 ? "" : "s"} today</div>
       </div>
       <div className="month">
-        <h3>{monthLabel}</h3>
+        <h3
+          onClick={viewingToday ? undefined : () => stepMonth(now.getMonth() - viewDate.getMonth() + 12 * (now.getFullYear() - viewDate.getFullYear()))}
+          style={viewingToday ? undefined : { cursor: "pointer" }}
+          title={viewingToday ? undefined : "Jump to today"}
+        >
+          {monthLabel}
+        </h3>
         <div style={{ display: "flex", gap: 2 }}>
-          <button className="icon-btn" style={{ width: 26, height: 26, border: 0, background: "transparent", cursor: "pointer", color: "var(--ink-2)" }}><Icon name="chevL" /></button>
-          <button className="icon-btn" style={{ width: 26, height: 26, border: 0, background: "transparent", cursor: "pointer", color: "var(--ink-2)" }}><Icon name="chevR" /></button>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => stepMonth(-1)}
+            aria-label="Previous month"
+            style={{ width: 26, height: 26, border: 0, background: "transparent", cursor: "pointer", color: "var(--ink-2)" }}
+          >
+            <Icon name="chevL" />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => stepMonth(1)}
+            aria-label="Next month"
+            style={{ width: 26, height: 26, border: 0, background: "transparent", cursor: "pointer", color: "var(--ink-2)" }}
+          >
+            <Icon name="chevR" />
+          </button>
         </div>
       </div>
       <div className="mini">

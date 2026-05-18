@@ -15,7 +15,7 @@ const DIR = path.join(process.cwd(), "data");
 const FILE = path.join(DIR, "config.json");
 
 export type GoogleAuth = { tokens: Credentials; email?: string };
-export type Config = { photosUrl?: string; google?: GoogleAuth };
+export type Config = { photosUrl?: string; google?: GoogleAuth; appleCalendarUrl?: string };
 
 export async function readConfig(): Promise<Config> {
   try {
@@ -55,6 +55,44 @@ export async function clearGoogleTokens(): Promise<void> {
   const cfg = await readConfig();
   delete cfg.google;
   await writeConfig(cfg);
+}
+
+export async function writeAppleCalendarUrl(url: string): Promise<void> {
+  const cfg = await readConfig();
+  cfg.appleCalendarUrl = url;
+  await writeConfig(cfg);
+}
+
+export async function clearAppleCalendarUrl(): Promise<void> {
+  const cfg = await readConfig();
+  delete cfg.appleCalendarUrl;
+  await writeConfig(cfg);
+}
+
+export function normalizeICloudCalendarUrl(input: string): string {
+  return input.trim().replace(/^webcal:\/\//i, "https://");
+}
+
+export function isValidICloudCalendarUrl(input: unknown): input is string {
+  if (typeof input !== "string") return false;
+  try {
+    const u = new URL(normalizeICloudCalendarUrl(input));
+    if (u.protocol !== "https:") return false;
+    if (!/^p\d+-caldav\.icloud\.com$/i.test(u.host)) return false;
+    if (!u.pathname.startsWith("/published/")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function maskICloudCalendarUrl(url: string): string {
+  try {
+    const u = new URL(normalizeICloudCalendarUrl(url));
+    return `${u.host}/published/…`;
+  } catch {
+    return "icloud.com/published/…";
+  }
 }
 
 export function isValidICloudShareUrl(input: unknown): input is string {

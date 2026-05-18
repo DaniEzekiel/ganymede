@@ -1,20 +1,22 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import Icon from "./Icon";
 
-type PhotosStatus =
+type SourceStatus =
   | { configured: false; source: "none" }
   | { configured: true; source: "env" | "file" | "dir"; hint: string };
 
 type GoogleStatus = { connected: false } | { connected: true; email: string | null };
 
-type ConfigStatus = { google: GoogleStatus; photos: PhotosStatus };
+type ConfigStatus = { google: GoogleStatus; appleCalendar: SourceStatus; photos: SourceStatus };
 
 export default function Settings() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<ConfigStatus | null>(null);
-  const [busy, setBusy] = useState<"google" | "photos" | null>(null);
+  const [busy, setBusy] = useState<"google" | "appleCalendar" | "photos" | null>(null);
   const [refreshed, setRefreshed] = useState(false);
+  const [appleUrlInput, setAppleUrlInput] = useState("");
+  const [appleSaveErr, setAppleSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +59,42 @@ export default function Settings() {
       await fetch("/api/config/photos", { method: "DELETE" });
       await load();
       window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const disconnectAppleCalendar = async () => {
+    setBusy("appleCalendar");
+    try {
+      await fetch("/api/config/apple-calendar", { method: "DELETE" });
+      await load();
+      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const connectAppleCalendar = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy("appleCalendar");
+    setAppleSaveErr(null);
+    try {
+      const r = await fetch("/api/config/apple-calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: appleUrlInput }),
+      });
+      const body = await r.json();
+      if (!r.ok) {
+        setAppleSaveErr(body.error ?? `HTTP ${r.status}`);
+        return;
+      }
+      setAppleUrlInput("");
+      await load();
+      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
+    } catch (e) {
+      setAppleSaveErr((e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -117,6 +155,52 @@ export default function Settings() {
                       <a className="btn-primary" href="/api/auth/google/start" style={{ display: "inline-block" }}>
                         Sign in with Google
                       </a>
+                    </>
+                  )}
+                </section>
+                <section className="settings-section">
+                  <h3>Apple Calendar</h3>
+                  {status.appleCalendar.configured ? (
+                    <>
+                      <p className="settings-meta">Connected · <code>{status.appleCalendar.hint}</code></p>
+                      {status.appleCalendar.source === "file" ? (
+                        <button
+                          className="btn-secondary"
+                          onClick={disconnectAppleCalendar}
+                          disabled={busy === "appleCalendar"}
+                        >
+                          {busy === "appleCalendar" ? "Disconnecting…" : "Disconnect"}
+                        </button>
+                      ) : (
+                        <p className="settings-note">
+                          Set via <code>.env.local (APPLE_CALENDAR_ICS_URL)</code> &mdash; edit the file to change.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="settings-meta">Not connected.</p>
+                      <form className="widget-connect-form" onSubmit={connectAppleCalendar}>
+                        <input
+                          type="text"
+                          placeholder="webcal://p…-caldav.icloud.com/published/…"
+                          value={appleUrlInput}
+                          onChange={(e) => setAppleUrlInput(e.target.value)}
+                          disabled={busy === "appleCalendar"}
+                          required
+                        />
+                        <button
+                          type="submit"
+                          className="btn-secondary"
+                          disabled={busy === "appleCalendar" || !appleUrlInput.trim()}
+                        >
+                          {busy === "appleCalendar" ? "Connecting…" : "Connect"}
+                        </button>
+                      </form>
+                      {appleSaveErr && <div className="error">{appleSaveErr}</div>}
+                      <p className="settings-note">
+                        In macOS Calendar, right-click a calendar &rarr; Share &rarr; Public Calendar &rarr; copy the link.
+                      </p>
                     </>
                   )}
                 </section>

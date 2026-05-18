@@ -60,7 +60,7 @@ ganymede/
 | ---      | ---                                                                                      |
 | Clock    | Browser `Date` + weather sun times                                                       |
 | Weather  | [Open-Meteo](https://open-meteo.com/), keyless                                           |
-| Calendar | Google Calendar API (primary calendar) — Sign in with Google                             |
+| Calendar | Google Calendar API + Apple Calendar public ICS (merged) — set up either or both         |
 | Tasks    | Google Tasks API (`@default` list, read + write) — Sign in with Google                   |
 | Photos   | Apple Photos shared album — set via the **Settings gear**; or local `PHOTOS_DIR` env     |
 | News     | `app/lib/mockData.ts` — wire up RSS or News API                                          |
@@ -75,6 +75,8 @@ All mock widgets keep their real shape and state — swap their data source and 
 
 **Google (Calendar + Tasks).** One OAuth flow covers both widgets. The first time the dashboard renders, Calendar and Tasks each show a **Sign in with Google** button — click either one, walk through Google's consent screen, and you land back on the dashboard connected. Tokens persist to `data/config.json` (gitignored, mode `0600`). The gear icon in the topstrip shows the connected account and a **Disconnect** button. See [Google Cloud setup](#google-cloud-setup) below for the one-time OAuth client creation.
 
+**Apple Calendar (optional, merges with Google).** In macOS Calendar, right-click a calendar → **Share Calendar** → toggle **Public Calendar** → copy the `webcal://…` link. Paste it into the Calendar widget's setup card (or in Settings → Apple Calendar). Events from both sources are merged, sorted by start time, and capped at the next 10. Heads-up: "public" means anyone with the link can read the calendar — don't share it widely.
+
 **Apple Photos.** Two ways, env var wins if both are set:
 
 - **Settings gear** — the Photos tile shows a paste-in card. Drop in an iCloud shared-album URL and click **Connect**. The source must be a shared album with **Public Website** turned on (Photos → shared album → people icon → toggle on → copy the link). The dashboard talks to Apple's unofficial `sharedstreams` endpoints to list photos and fetch signed image URLs.
@@ -83,7 +85,8 @@ All mock widgets keep their real shape and state — swap their data source and 
 ### API routes
 
 - `GET /api/weather` — current, 6 hourly, 5-day forecast, sunrise/sunset. Cached 10 min.
-- `GET /api/calendar` — Google Calendar events in the next 14 days from the primary calendar, sorted, max 10. Returns `{configured: false}` if not signed in.
+- `GET /api/calendar` — events for the next 14 days from Google (primary) + Apple (published ICS), merged and sorted, max 10. Returns `{configured: false}` if neither source is set up.
+- `POST /api/config/apple-calendar` / `DELETE` — save or clear the Apple Calendar public URL.
 - `GET /api/tasks` — list Google Tasks from `@default`. `POST /api/tasks` creates one (`{title}`).
 - `PATCH /api/tasks/[id]` — toggle done (`{done: boolean}`) or rename (`{title}`). `DELETE /api/tasks/[id]` — remove.
 - `GET /api/auth/google/start` — begin OAuth consent. `GET /api/auth/google/callback` — exchange code + persist tokens. `POST /api/auth/google/disconnect` — revoke + clear.
@@ -138,6 +141,7 @@ npm run dev                       # http://localhost:3000
 | `GOOGLE_CLIENT_ID` | OAuth client ID from Google Cloud Console | `1234…apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret | `GOCSPX-…` |
 | `GOOGLE_REDIRECT_URI` | Callback URL registered on the OAuth client | `http://localhost:3000/api/auth/google/callback` |
+| `APPLE_CALENDAR_ICS_URL` | Published iCloud Calendar URL. Overrides the UI value when set. | `webcal://p98-caldav.icloud.com/published/2/…` |
 | `PHOTOS_DIR` | Absolute path to a local photo dir. Overrides the iCloud UI setting **if the directory exists**. | `/home/pi/ganymede-photos` |
 
 > **Apple Photos source:** in Photos, open a shared album → people icon → toggle **Public Website** on → copy the link Apple displays. Anyone with the link can view the album.
