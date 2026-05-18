@@ -14,16 +14,6 @@ export const mockNews = {
   ],
 };
 
-export type Task = { id: string; label: string; meta: string; done: boolean };
-export const mockTasks: Task[] = [
-  { id: "t1", label: "Buy groceries for dinner", meta: "Today", done: false },
-  { id: "t2", label: "Submit expense report", meta: "Today · Work", done: true },
-  { id: "t3", label: "Reply to Maya's invite", meta: "Tomorrow", done: false },
-  { id: "t4", label: "Water the ficus", meta: "Weekly", done: true },
-  { id: "t5", label: "Book movers — June 3", meta: "Sat", done: false },
-  { id: "t6", label: "Prep slides for Q2 review", meta: "Tue · Work", done: false },
-];
-
 export type HomeTile = { id: string; name: string; icon: IconName; state: string; sub: string; on: boolean };
 export const mockHome: HomeTile[] = [
   { id: "h1", name: "Front porch", icon: "bulb",  state: "24%",    sub: "Dim · warm",     on: true  },

@@ -17,27 +17,34 @@ ganymede/
 │   │   ├── Settings.tsx        # Gear-icon modal in the topstrip
 │   │   ├── Clock.tsx           # Time + long date + sunrise/sunset
 │   │   ├── Weather.tsx         # Current + 6 hourly + 5-day bar forecast
-│   │   ├── Calendar.tsx        # Mini month grid + 4-day agenda
+│   │   ├── Calendar.tsx        # Mini month grid + 4-day agenda (Google Calendar)
 │   │   ├── Photos.tsx          # Cross-fade slideshow, tap to advance
 │   │   ├── News.tsx            # Lede + headlines (mock)
-│   │   ├── Tasks.tsx           # Checklist with progress (mock, interactive)
+│   │   ├── Tasks.tsx           # Google Tasks (read/write)
 │   │   ├── Home.tsx            # Smart home tiles (mock, interactive)
 │   │   ├── Commute.tsx         # Traffic routes (mock)
 │   │   ├── Stocks.tsx          # Tickers + sparklines (mock)
 │   │   └── Quote.tsx           # Daily quote (mock)
 │   ├── lib/
 │   │   ├── mockData.ts         # Seed data for widgets without a real API yet
-│   │   ├── config.ts           # Reads/writes data/config.json + validators
+│   │   ├── config.ts           # Reads/writes data/config.json
+│   │   ├── google.ts           # OAuth client + auto-refreshing googleFetch
 │   │   └── icloudShared.ts     # Apple Photos shared-album client
 │   └── api/
 │       ├── weather/route.ts    # Open-Meteo proxy (no key)
-│       ├── calendar/route.ts   # Google Calendar ICS feed
+│       ├── calendar/route.ts   # Google Calendar API (primary calendar, 14-day window)
+│       ├── tasks/
+│       │   ├── route.ts        # GET list / POST create on @default task list
+│       │   └── [id]/route.ts   # PATCH toggle/edit / DELETE
+│       ├── auth/google/
+│       │   ├── start/route.ts      # Begin OAuth consent
+│       │   ├── callback/route.ts   # Exchange code, persist tokens
+│       │   └── disconnect/route.ts # Revoke + clear tokens
 │       ├── photos/
 │       │   ├── route.ts        # PHOTOS_DIR if set, else iCloud shared album
 │       │   └── [name]/route.ts # Streams one local image (PHOTOS_DIR mode only)
 │       └── config/
-│           ├── route.ts            # GET combined connection status
-│           ├── calendar/route.ts   # POST/DELETE the Google Calendar URL
+│           ├── route.ts            # GET combined Google + photos status
 │           └── photos/route.ts     # POST/DELETE the iCloud shared-album URL
 ├── data/                       # Runtime config (gitignored, mode 0600)
 │   └── config.json             # Created on first save from the UI
@@ -53,10 +60,10 @@ ganymede/
 | ---      | ---                                                                                      |
 | Clock    | Browser `Date` + weather sun times                                                       |
 | Weather  | [Open-Meteo](https://open-meteo.com/), keyless                                           |
-| Calendar | Google Calendar secret iCal URL — set via the **Settings gear** or `GOOGLE_CALENDAR_ICS_URL` |
+| Calendar | Google Calendar API (primary calendar) — Sign in with Google                             |
+| Tasks    | Google Tasks API (`@default` list, read + write) — Sign in with Google                   |
 | Photos   | Apple Photos shared album — set via the **Settings gear**; or local `PHOTOS_DIR` env     |
 | News     | `app/lib/mockData.ts` — wire up RSS or News API                                          |
-| Tasks    | `app/lib/mockData.ts` — wire up Todoist/Google Tasks                                     |
 | Home     | `app/lib/mockData.ts` — wire up Home Assistant                                           |
 | Commute  | `app/lib/mockData.ts` — wire up Google Maps / Waze                                       |
 | Stocks   | `app/lib/mockData.ts` — wire up Finnhub / Alpha Vantage                                  |
@@ -66,22 +73,46 @@ All mock widgets keep their real shape and state — swap their data source and 
 
 ### Connecting your data
 
-Calendar and Photos can be set up two ways. The env var, if present, wins:
+**Google (Calendar + Tasks).** One OAuth flow covers both widgets. The first time the dashboard renders, Calendar and Tasks each show a **Sign in with Google** button — click either one, walk through Google's consent screen, and you land back on the dashboard connected. Tokens persist to `data/config.json` (gitignored, mode `0600`). The gear icon in the topstrip shows the connected account and a **Disconnect** button. See [Google Cloud setup](#google-cloud-setup) below for the one-time OAuth client creation.
 
-- **Settings gear** (recommended for most setups). The first time the dashboard renders, the Calendar and Photos tiles each show a paste-in setup card. Drop in the URL, click **Connect**, and it persists to `data/config.json` (gitignored, mode `0600`). The gear icon in the topstrip opens a modal with the current connection state, a **Refresh all** button, and **Disconnect** buttons.
-- **Environment variables** (set once and forget). Put `GOOGLE_CALENDAR_ICS_URL` and/or `PHOTOS_DIR` in `.env.local`. When set, the matching widget treats the env value as authoritative; the Settings modal shows "Set via .env.local" and hides Disconnect.
+**Apple Photos.** Two ways, env var wins if both are set:
 
-For Apple Photos, the source must be a **shared album** with **Public Website** turned on (Apple Photos → shared album → people icon → toggle on → copy the link). The dashboard talks to Apple's unofficial `sharedstreams` endpoints to list photos and fetch signed image URLs.
+- **Settings gear** — the Photos tile shows a paste-in card. Drop in an iCloud shared-album URL and click **Connect**. The source must be a shared album with **Public Website** turned on (Photos → shared album → people icon → toggle on → copy the link). The dashboard talks to Apple's unofficial `sharedstreams` endpoints to list photos and fetch signed image URLs.
+- **`PHOTOS_DIR` env var** — point at a local directory of `.jpg`/`.png`/`.webp` files. If the directory exists, this overrides the iCloud setting; Settings shows "Set via .env.local" and hides Disconnect.
 
 ### API routes
 
 - `GET /api/weather` — current, 6 hourly, 5-day forecast, sunrise/sunset. Cached 10 min.
-- `GET /api/calendar` — events within 14 days, sorted, max 10. Expands recurring events. Cached 5 min.
-- `GET /api/photos` — JSON `{configured, photos:[{url,title,meta}]}`. Either local files under `/api/photos/[name]` or direct iCloud signed URLs.
+- `GET /api/calendar` — Google Calendar events in the next 14 days from the primary calendar, sorted, max 10. Returns `{configured: false}` if not signed in.
+- `GET /api/tasks` — list Google Tasks from `@default`. `POST /api/tasks` creates one (`{title}`).
+- `PATCH /api/tasks/[id]` — toggle done (`{done: boolean}`) or rename (`{title}`). `DELETE /api/tasks/[id]` — remove.
+- `GET /api/auth/google/start` — begin OAuth consent. `GET /api/auth/google/callback` — exchange code + persist tokens. `POST /api/auth/google/disconnect` — revoke + clear.
+- `GET /api/photos` — JSON `{configured, photos:[{url,title,meta}]}`. Local files via `/api/photos/[name]` or iCloud signed URLs.
 - `GET /api/photos/[name]` — streams one image file (PHOTOS_DIR mode). Path-traversal guarded.
-- `GET /api/config` — combined `{calendar, photos}` status: `configured`, `source` (`env` / `file` / `dir` / `none`), `hint`.
-- `POST /api/config/calendar` / `DELETE` — save or clear the Google Calendar URL.
+- `GET /api/config` — combined `{google, photos}` connection status.
 - `POST /api/config/photos` / `DELETE` — save or clear the iCloud shared-album URL.
+
+### Google Cloud setup
+
+One-time, ~5 minutes:
+
+1. https://console.cloud.google.com → **Create Project** (name it whatever).
+2. **APIs & Services → Library** — enable **Google Calendar API** and **Google Tasks API**.
+3. **APIs & Services → OAuth consent screen**:
+   - User type: **External**
+   - Add scopes `.../auth/calendar.readonly` and `.../auth/tasks`
+   - Add yourself as a **test user**
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   - Application type: **Web application**
+   - Authorized redirect URIs: `http://localhost:3000/api/auth/google/callback` (add `http://<pi-ip>:3000/api/auth/google/callback` when you deploy)
+   - Copy the **Client ID** and **Client secret** into `.env.local`:
+     ```
+     GOOGLE_CLIENT_ID=...
+     GOOGLE_CLIENT_SECRET=...
+     GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+     ```
+
+> **Heads-up on Testing mode.** Until you publish the OAuth app, refresh tokens expire after **7 days** — meaning you'd have to re-sign-in weekly on a long-running kiosk. To avoid that, **Publish** the app from the consent screen (no verification needed for these scopes; users just see a "this app isn't verified" advisory once and click through).
 
 ## Local development (Mac/Linux)
 
@@ -95,7 +126,7 @@ npm run dev                       # http://localhost:3000
 
 ### Environment variables
 
-All optional — Calendar and Photos can also be configured at runtime from the Settings gear.
+`GOOGLE_*` are required for Calendar and Tasks. `PHOTOS_DIR` is optional — Photos can also be configured at runtime from the Settings gear.
 
 | Var | Purpose | Example |
 | --- | --- | --- |
@@ -104,15 +135,12 @@ All optional — Calendar and Photos can also be configured at runtime from the 
 | `WEATHER_LAT` | Latitude | `40.7128` |
 | `WEATHER_LON` | Longitude | `-74.0060` |
 | `WEATHER_TZ` | IANA timezone | `America/New_York` |
-| `GOOGLE_CALENDAR_ICS_URL` | Calendar ICS feed. Overrides the UI setting when present. | `https://calendar.google.com/calendar/ical/.../basic.ics` |
+| `GOOGLE_CLIENT_ID` | OAuth client ID from Google Cloud Console | `1234…apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret | `GOCSPX-…` |
+| `GOOGLE_REDIRECT_URI` | Callback URL registered on the OAuth client | `http://localhost:3000/api/auth/google/callback` |
 | `PHOTOS_DIR` | Absolute path to a local photo dir. Overrides the iCloud UI setting **if the directory exists**. | `/home/pi/ganymede-photos` |
 
-> **Heads-up on precedence.** If you want to manage Calendar or Photos from the Settings UI, leave the matching env var empty (Calendar) or unset/missing-on-disk (Photos). When the env value is present and usable, the Settings modal shows "Set via .env.local" and hides Disconnect.
-
-#### Getting the URLs
-
-- **Google Calendar:** open [Google Calendar](https://calendar.google.com) → hover the calendar → ⋮ → **Settings and sharing** → scroll to **Integrate calendar** → copy **Secret address in iCal format**. Treat the URL like a password.
-- **Apple Photos:** in Photos, open a shared album → people icon → toggle **Public Website** on → copy the link Apple displays. Anyone with the link can view the album.
+> **Apple Photos source:** in Photos, open a shared album → people icon → toggle **Public Website** on → copy the link Apple displays. Anyone with the link can view the album.
 
 ## Raspberry Pi deployment
 
@@ -142,8 +170,8 @@ git clone <your-repo-url> ganymede
 cd ganymede
 npm ci
 cp .env.example .env.local
-nano .env.local                  # set NEXT_PUBLIC_*, WEATHER_*; leave the rest empty
-chmod 600 .env.local             # the file may hold secrets later
+nano .env.local                  # set NEXT_PUBLIC_*, WEATHER_*, GOOGLE_* (see README §Google Cloud setup)
+chmod 600 .env.local             # contains your OAuth client secret
 npm run build
 ```
 
@@ -153,7 +181,7 @@ If you plan to use a **local photo folder** instead of an iCloud shared album, a
 mkdir -p ~/ganymede-photos       # only if you're using PHOTOS_DIR
 ```
 
-If you'll use the **Settings UI** to connect Calendar and Photos, you can skip the local photo dir entirely — just leave `PHOTOS_DIR` unset (or pointed at a path that doesn't exist) and `GOOGLE_CALENDAR_ICS_URL` empty.
+If you'll use the **Settings UI** to connect Photos, you can skip the local photo dir entirely — just leave `PHOTOS_DIR` unset (or pointed at a path that doesn't exist). Don't forget to register `http://<pi-ip>:3000/api/auth/google/callback` as an authorized redirect URI on your Google OAuth client and set `GOOGLE_REDIRECT_URI` to match.
 
 Sanity check the production server:
 
@@ -259,7 +287,6 @@ Each "mock" widget is a drop-in target for a real data source. The pattern:
 
 Good candidates:
 - **News** → any RSS-to-JSON service or the NewsAPI.org free tier.
-- **Tasks** → Todoist REST API (personal token) or Google Tasks.
 - **Home** → Home Assistant long-lived access token on `/api/states`.
 - **Commute** → Google Maps Distance Matrix or Waze embeds.
 - **Stocks** → Finnhub free tier (60 calls/min) or Yahoo Finance via `yahoo-finance2`.
@@ -271,10 +298,13 @@ Good candidates:
 | `npm run dev` fails with `Unsupported engine` | Node is too old. Install Node 20+ via nvm or NodeSource. |
 | Weather panel stuck on "failed to load" | Check `WEATHER_LAT`/`LON` are numeric; test `curl http://localhost:3000/api/weather`. |
 | Clock or Calendar are off by hours | Set the Pi's timezone with `sudo raspi-config` → Localization Options → Timezone, then `sudo systemctl restart ganymede`. |
-| Calendar tile shows "Connect Google Calendar" forever | The save didn't validate the URL. Open the Calendar setting from the gear and confirm the URL is `https://calendar.google.com/calendar/ical/.../basic.ics`. Or set `GOOGLE_CALENDAR_ICS_URL` in `.env.local` and restart. |
+| Calendar/Tasks tile shows "Sign in with Google" after you signed in | The redirect URI registered on your OAuth client doesn't match `GOOGLE_REDIRECT_URI` in `.env.local` (must match exactly, including port). |
+| OAuth callback redirects to `/?google=error&reason=no_refresh_token` | You signed in without `prompt=consent`, or Google returned an old grant. Disconnect from the Settings gear, then sign in again. |
+| OAuth callback redirects to `/?google=error&reason=bad_state` | Your browser blocked the `g_oauth_state` cookie between start and callback. Don't use a different browser/profile mid-flow. |
+| Tasks/Calendar suddenly empty after about a week | The OAuth app is in **Testing** mode — refresh tokens expire in 7 days. Publish the app from the consent screen (no verification needed for these scopes). |
 | Photos tile shows "Connect Apple Photos" but you set `PHOTOS_DIR` | The directory at `PHOTOS_DIR` doesn't exist or isn't readable. Either `mkdir -p` the path or unset the env var to use the iCloud flow. |
 | Photos suddenly stop loading, error mentions `iCloud webstream` or `partition redirect` | Apple's shared-streams protocol is unofficial; they may have changed it. Disconnect/reconnect from the Settings gear; if it keeps failing, the protocol shim in `app/lib/icloudShared.ts` needs an update. |
 | iCloud photos turn into broken images after the dashboard sits idle for an hour | Signed iCloud URLs have expired. Click **Refresh all** in Settings — or wait for the next scheduled poll (15 min). |
 | Chromium opens a blank tab | Boot takes longer than 10s — bump the `sleep 10` in `wayfire.ini` to `sleep 20`. |
 | Service keeps restarting | `journalctl -u ganymede -n 100` to see the crash. Most common: missing `.env.local` or unbuilt app (`npm run build`). |
-| Settings gear → Disconnect button missing | The widget is reading from an env var, which always wins. Empty out `GOOGLE_CALENDAR_ICS_URL` (or remove/break `PHOTOS_DIR`) in `.env.local` and restart. |
+| Settings gear → Photos Disconnect button missing | Photos is reading from `PHOTOS_DIR`, which always wins when the directory exists. Remove/rename `PHOTOS_DIR` in `.env.local` and restart. |
