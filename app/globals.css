@@ -583,7 +583,18 @@ body {
 }
 .tasks .task-add button:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
 .tasks .task-add button:disabled { opacity: 0.4; cursor: not-allowed; }
-.tasks ul { list-style: none; padding: 0; margin: 0; }
+.tasks ul {
+  list-style: none; padding: 0; margin: 0;
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+.tasks ul::-webkit-scrollbar { width: 8px; }
+.tasks ul::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; transition: background 120ms ease; }
+.tasks ul::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+.tasks ul::-webkit-scrollbar-track { background: transparent; }
 .tasks li {
   display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: center;
   padding: 10px 0;
