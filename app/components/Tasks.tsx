@@ -1,6 +1,9 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Icon from "./Icon";
+import { demoTasks } from "../lib/mockData";
+
+const openSettings = () => window.dispatchEvent(new CustomEvent("ganymede:open-settings"));
 
 type Task = { id: string; label: string; done: boolean; meta: string };
 type TasksResponse =
@@ -27,7 +30,7 @@ export default function Tasks({ className = "" }: { className?: string }) {
       }
       if ("configured" in body && body.configured === false) {
         setConfigured(false);
-        setTasks([]);
+        setTasks(demoTasks.map((t) => ({ ...t })));
         setErr(null);
         return;
       }
@@ -57,11 +60,14 @@ export default function Tasks({ className = "" }: { className?: string }) {
     };
   }, [load]);
 
+  const demo = configured === false;
+
   const toggle = async (id: string) => {
     const target = tasks.find((t) => t.id === id);
     if (!target) return;
     const nextDone = !target.done;
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: nextDone } : t)));
+    if (demo) return; // sample data: keep changes local, never call the API
     try {
       const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
         method: "PATCH",
@@ -78,6 +84,11 @@ export default function Tasks({ className = "" }: { className?: string }) {
     e.preventDefault();
     const title = input.trim();
     if (!title || adding) return;
+    if (demo) {
+      setTasks((prev) => [{ id: `demo-${Date.now()}`, label: title, done: false, meta: "" }, ...prev]);
+      setInput("");
+      return;
+    }
     setAdding(true);
     try {
       const res = await fetch("/api/tasks", {
@@ -96,24 +107,6 @@ export default function Tasks({ className = "" }: { className?: string }) {
     }
   };
 
-  if (configured === false) {
-    return (
-      <div className={`card tasks ${className}`}>
-        <div className="card-head">
-          <div className="card-title">Tasks</div>
-          <div className="card-sub">Setup required</div>
-        </div>
-        <div className="widget-setup">
-          <h3>Sign in with Google</h3>
-          <p className="widget-setup-note">Connects to your Google Tasks (read &amp; write).</p>
-          <a className="btn-primary" href="/api/auth/google/start" style={{ display: "inline-block", textAlign: "center" }}>
-            Sign in with Google
-          </a>
-        </div>
-      </div>
-    );
-  }
-
   const done = tasks.filter((t) => t.done).length;
   const total = tasks.length;
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
@@ -122,7 +115,13 @@ export default function Tasks({ className = "" }: { className?: string }) {
     <div className={`card tasks ${className}`}>
       <div className="card-head">
         <div className="card-title">Tasks</div>
-        <div className="card-sub">{done} of {total} done</div>
+        {demo ? (
+          <button type="button" className="demo-badge" onClick={openSettings} title="Sign in to use your own tasks">
+            Demo
+          </button>
+        ) : (
+          <div className="card-sub">{done} of {total} done</div>
+        )}
       </div>
       <form className="task-add" onSubmit={add}>
         <input

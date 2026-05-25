@@ -1,0 +1,6 @@
+# Never upload runtime secrets or local env to Vercel deployments.
+# (.gitignore is NOT used by the Vercel CLI — this file is.)
+/data/
+.env
+.env.local
+.env.*.local

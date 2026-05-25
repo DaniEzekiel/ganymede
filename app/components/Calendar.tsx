@@ -1,6 +1,9 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
+import { demoCalendarEvents } from "../lib/mockData";
+
+const openSettings = () => window.dispatchEvent(new CustomEvent("ganymede:open-settings"));
 
 type Event = { start: string; end: string; summary: string; location: string };
 type CalendarResponse =
@@ -66,9 +69,6 @@ export default function Calendar({ className = "" }: { className?: string }) {
   const [now, setNow] = useState<Date>(() => new Date());
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [selectedIso, setSelectedIso] = useState<string | null>(null);
-  const [appleUrlInput, setAppleUrlInput] = useState("");
-  const [appleSaving, setAppleSaving] = useState(false);
-  const [appleSaveErr, setAppleSaveErr] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -92,7 +92,7 @@ export default function Calendar({ className = "" }: { className?: string }) {
       }
       if ("configured" in body && body.configured === false) {
         setConfigured(false);
-        setEvents([]);
+        setEvents(demoCalendarEvents());
         setErr(null);
         return;
       }
@@ -142,71 +142,19 @@ export default function Calendar({ className = "" }: { className?: string }) {
     setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
   };
 
-  const connectApple = async (e: FormEvent) => {
-    e.preventDefault();
-    setAppleSaving(true);
-    setAppleSaveErr(null);
-    try {
-      const r = await fetch("/api/config/apple-calendar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: appleUrlInput }),
-      });
-      const body = await r.json();
-      if (!r.ok) {
-        setAppleSaveErr(body.error ?? `HTTP ${r.status}`);
-        return;
-      }
-      setAppleUrlInput("");
-      await load();
-      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
-    } catch (e) {
-      setAppleSaveErr((e as Error).message);
-    } finally {
-      setAppleSaving(false);
-    }
-  };
-
-  if (configured === false) {
-    return (
-      <div className={`card cal ${className}`}>
-        <div className="card-head">
-          <div className="card-title">Calendar</div>
-          <div className="card-sub">Setup required</div>
-        </div>
-        <div className="widget-setup">
-          <h3>Connect a calendar</h3>
-          <a className="btn-primary" href="/api/auth/google/start" style={{ display: "inline-block", textAlign: "center" }}>
-            Sign in with Google
-          </a>
-          <div className="widget-setup-divider"><span>or paste an Apple Calendar link</span></div>
-          <form className="widget-connect-form" onSubmit={connectApple}>
-            <input
-              type="text"
-              placeholder="webcal://p…-caldav.icloud.com/published/…"
-              value={appleUrlInput}
-              onChange={(e) => setAppleUrlInput(e.target.value)}
-              disabled={appleSaving}
-              required
-            />
-            <button type="submit" className="btn-secondary" disabled={appleSaving || !appleUrlInput.trim()}>
-              {appleSaving ? "Connecting…" : "Connect"}
-            </button>
-          </form>
-          {appleSaveErr && <div className="error">{appleSaveErr}</div>}
-          <p className="widget-setup-note">
-            In macOS Calendar, right-click a calendar &rarr; Share &rarr; Public Calendar &rarr; copy the link.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const demo = configured === false;
 
   return (
     <div className={`card cal ${className}`}>
       <div className="card-head">
         <div className="card-title">Calendar</div>
-        <div className="card-sub">{today} event{today === 1 ? "" : "s"} today</div>
+        {demo ? (
+          <button type="button" className="demo-badge" onClick={openSettings} title="Sign in to use your own calendar">
+            Demo
+          </button>
+        ) : (
+          <div className="card-sub">{today} event{today === 1 ? "" : "s"} today</div>
+        )}
       </div>
       <div className="month">
         <h3

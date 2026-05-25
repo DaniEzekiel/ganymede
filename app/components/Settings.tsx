@@ -17,6 +17,8 @@ export default function Settings() {
   const [refreshed, setRefreshed] = useState(false);
   const [appleUrlInput, setAppleUrlInput] = useState("");
   const [appleSaveErr, setAppleSaveErr] = useState<string | null>(null);
+  const [photosUrlInput, setPhotosUrlInput] = useState("");
+  const [photosSaveErr, setPhotosSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -34,6 +36,12 @@ export default function Settings() {
     window.addEventListener("ganymede:config-changed", handler);
     return () => window.removeEventListener("ganymede:config-changed", handler);
   }, [load]);
+
+  useEffect(() => {
+    const open = () => setOpen(true);
+    window.addEventListener("ganymede:open-settings", open);
+    return () => window.removeEventListener("ganymede:open-settings", open);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -95,6 +103,31 @@ export default function Settings() {
       window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
     } catch (e) {
       setAppleSaveErr((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const connectPhotos = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy("photos");
+    setPhotosSaveErr(null);
+    try {
+      const r = await fetch("/api/config/photos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: photosUrlInput }),
+      });
+      const body = await r.json();
+      if (!r.ok) {
+        setPhotosSaveErr(body.error ?? `HTTP ${r.status}`);
+        return;
+      }
+      setPhotosUrlInput("");
+      await load();
+      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
+    } catch (e) {
+      setPhotosSaveErr((e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -224,9 +257,30 @@ export default function Settings() {
                       )}
                     </>
                   ) : (
-                    <p className="settings-meta">
-                      Not connected. Use the photos widget to add a URL.
-                    </p>
+                    <>
+                      <p className="settings-meta">Not connected. Showing sample photos.</p>
+                      <form className="widget-connect-form" onSubmit={connectPhotos}>
+                        <input
+                          type="url"
+                          placeholder="https://www.icloud.com/sharedalbum/#…"
+                          value={photosUrlInput}
+                          onChange={(e) => setPhotosUrlInput(e.target.value)}
+                          disabled={busy === "photos"}
+                          required
+                        />
+                        <button
+                          type="submit"
+                          className="btn-secondary"
+                          disabled={busy === "photos" || !photosUrlInput.trim()}
+                        >
+                          {busy === "photos" ? "Connecting…" : "Connect"}
+                        </button>
+                      </form>
+                      {photosSaveErr && <div className="error">{photosSaveErr}</div>}
+                      <p className="settings-note">
+                        In Apple Photos, open a shared album &rarr; enable <strong>Public Website</strong> &rarr; copy the link.
+                      </p>
+                    </>
                   )}
                 </section>
               </>

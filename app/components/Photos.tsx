@@ -1,5 +1,8 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { demoPhotos } from "../lib/mockData";
+
+const openSettings = () => window.dispatchEvent(new CustomEvent("ganymede:open-settings"));
 
 type Photo = { url: string; title: string; meta: string };
 type PhotosResponse =
@@ -18,9 +21,6 @@ export default function Photos({ className = "" }: { className?: string }) {
   const [idx, setIdx] = useState(0);
   const [fading, setFading] = useState(false);
   const [resetTick, setResetTick] = useState(0);
-  const [urlInput, setUrlInput] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -28,7 +28,7 @@ export default function Photos({ className = "" }: { className?: string }) {
       const body: PhotosResponse = await res.json();
       if ("configured" in body && body.configured === false) {
         setConfigured(false);
-        setPhotos([]);
+        setPhotos(demoPhotos());
         setLoadErr(null);
         return;
       }
@@ -91,65 +91,7 @@ export default function Photos({ className = "" }: { className?: string }) {
     setResetTick((n) => n + 1);
   };
 
-  const connect = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setSaveErr(null);
-    try {
-      const r = await fetch("/api/config/photos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: urlInput }),
-      });
-      const body = await r.json();
-      if (!r.ok) {
-        setSaveErr(body.error ?? `HTTP ${r.status}`);
-        return;
-      }
-      setUrlInput("");
-      await load();
-      window.dispatchEvent(new CustomEvent("ganymede:config-changed"));
-    } catch (e) {
-      setSaveErr((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (configured === false) {
-    return (
-      <div className={`card photos ${className}`}>
-        <div className="card-head">
-          <div className="card-title">Photos</div>
-          <div className="card-sub">Setup required</div>
-        </div>
-        <div className="widget-setup">
-          <h3>Connect Apple Photos</h3>
-          <ol>
-            <li>In Apple Photos, open a shared album.</li>
-            <li>Tap the people icon <strong>›</strong> <strong>Public Website</strong> &mdash; turn it on.</li>
-            <li>Copy the link Apple generates.</li>
-            <li>Paste it below and click <strong>Connect</strong>.</li>
-          </ol>
-          <form className="widget-connect-form" onSubmit={connect}>
-            <input
-              type="url"
-              placeholder="https://www.icloud.com/sharedalbum/#…"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              disabled={saving}
-              required
-            />
-            <button type="submit" className="btn-primary" disabled={saving || !urlInput.trim()}>
-              {saving ? "Connecting…" : "Connect"}
-            </button>
-          </form>
-          {saveErr && <div className="error">{saveErr}</div>}
-          <p className="widget-setup-note">Anyone with this link can view the album. Don&rsquo;t share it widely.</p>
-        </div>
-      </div>
-    );
-  }
+  const demo = configured === false;
 
   if (photos.length === 0) {
     return (
@@ -168,6 +110,11 @@ export default function Photos({ className = "" }: { className?: string }) {
 
   return (
     <div className={`card flush photos ${className}`}>
+      {demo && (
+        <button type="button" className="demo-badge" onClick={openSettings} title="Connect your own album in Settings">
+          Demo
+        </button>
+      )}
       <div
         className={"photo-frame" + (fading ? " out" : "")}
         key={safeIdx}

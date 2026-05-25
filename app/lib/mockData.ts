@@ -43,8 +43,74 @@ export const mockQuote = {
 };
 
 export const mockPhotoPalettes = [
-  { title: "Camden Harbor, July",    meta: "Family album · 2024",   hue: 32,  hue2: 12  },
-  { title: "Kitchen windowsill",     meta: "Household · this week", hue: 140, hue2: 80  },
-  { title: "Back porch, gold hour",  meta: "Family album · 2025",   hue: 55,  hue2: 22  },
-  { title: "First snow",             meta: "Family album · 2023",   hue: 220, hue2: 260 },
+  { title: "Camden Harbor, July",    meta: "Sample album · 2024",   hue: 32,  hue2: 12  },
+  { title: "Kitchen windowsill",     meta: "Sample album · spring", hue: 140, hue2: 80  },
+  { title: "Back porch, gold hour",  meta: "Sample album · 2025",   hue: 55,  hue2: 22  },
+  { title: "First snow",             meta: "Sample album · 2023",   hue: 220, hue2: 260 },
 ];
+
+/* ---------- Demo data shown until a real source is connected ---------- */
+// These power the public/unconfigured view of Calendar, Tasks, and Photos.
+// They never touch the server: a widget renders them only when its API route
+// reports `configured: false`, so no personal data is involved.
+
+export type DemoEvent = { start: string; end: string; summary: string; location: string };
+
+// Built relative to "now" so the agenda and mini-month always look current.
+export function demoCalendarEvents(): DemoEvent[] {
+  const slot = (dayOffset: number, hour: number, minute = 0, durationMin = 60) => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() + dayOffset);
+    start.setHours(hour, minute, 0, 0);
+    const end = new Date(start.getTime() + durationMin * 60_000);
+    return { start: start.toISOString(), end: end.toISOString() };
+  };
+  return [
+    { ...slot(0, 9, 0, 30),   summary: "Team standup",      location: "Zoom" },
+    { ...slot(0, 12, 30, 60), summary: "Lunch with Sam",    location: "Café Luna" },
+    { ...slot(1, 10, 0, 90),  summary: "Design review",     location: "Room 4B" },
+    { ...slot(2, 8, 30, 45),  summary: "Dentist",           location: "Downtown" },
+    { ...slot(3, 18, 0, 120), summary: "Dinner party",      location: "Home" },
+    { ...slot(5, 14, 0, 60),  summary: "1:1 with Alex",     location: "" },
+  ];
+}
+
+export type DemoTask = { id: string; label: string; done: boolean; meta: string };
+export const demoTasks: DemoTask[] = [
+  { id: "demo-1", label: "Water the plants",      done: false, meta: "Today" },
+  { id: "demo-2", label: "Reply to the landlord", done: false, meta: "" },
+  { id: "demo-3", label: "Pick up groceries",     done: false, meta: "Tomorrow" },
+  { id: "demo-4", label: "Renew library books",   done: true,  meta: "" },
+  { id: "demo-5", label: "Book dentist visit",    done: true,  meta: "" },
+];
+
+export type DemoPhoto = { url: string; title: string; meta: string };
+
+// Self-contained SVG gradients — no external image requests.
+function gradientPhoto(hue: number, hue2: number): string {
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='900'>` +
+    `<defs>` +
+    `<linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>` +
+    `<stop offset='0' stop-color='hsl(${hue},62%,58%)'/>` +
+    `<stop offset='1' stop-color='hsl(${hue2},56%,40%)'/>` +
+    `</linearGradient>` +
+    `<radialGradient id='h' cx='0.72' cy='0.22' r='0.85'>` +
+    `<stop offset='0' stop-color='hsla(${hue},85%,88%,0.5)'/>` +
+    `<stop offset='1' stop-color='hsla(${hue},85%,88%,0)'/>` +
+    `</radialGradient>` +
+    `</defs>` +
+    `<rect width='1200' height='900' fill='url(#g)'/>` +
+    `<rect width='1200' height='900' fill='url(#h)'/>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+export function demoPhotos(): DemoPhoto[] {
+  return mockPhotoPalettes.map((p) => ({
+    url: gradientPhoto(p.hue, p.hue2),
+    title: p.title,
+    meta: p.meta,
+  }));
+}

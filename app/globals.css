@@ -299,6 +299,23 @@ body {
 }
 .card-sub { font: 400 11px/1 var(--font-sans); color: var(--ink-3); }
 
+/* "Demo" chip shown on widgets backed by sample data; click opens Settings. */
+.demo-badge {
+  font: 500 9px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+.demo-badge:hover { opacity: 1; }
+.photos .demo-badge { position: absolute; top: 14px; left: 14px; z-index: 2; }
+
 /* ---------- Clock ---------- */
 .clock { display: flex; flex-direction: column; justify-content: space-between; min-height: 100%; }
 .clock .time {
